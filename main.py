@@ -1,109 +1,90 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
-import segno
+from pydantic import BaseModel
+from supabase import create_client, Client
+import segno, base64, uuid, os
 from unidecode import unidecode
 from io import BytesIO
-import base64
 
-# --- INICIALIZAÇÃO DA API ---
-app = FastAPI(
-    title="API Pix Robusta",
-    description="Geração de Pix Estático com QR Code e suporte a CORS",
-    version="1.1.0"
-)
+app = FastAPI()
 
-# --- CONFIGURAÇÃO DE CORS ---
-# Isso permite que seu site de doação (ou qualquer outro) acesse a API sem ser bloqueado
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- MODELO DE DADOS (VALIDAÇÃO) ---
+# --- CONFIGURAÇÃO SUPABASE ---
+# No Render, você vai adicionar essas duas como Variáveis de Ambiente
+SUPABASE_URL = os.getenv("https://xrjjoejdffoygwmpvrsq.supabase.co")
+SUPABASE_KEY = os.getenv("sb_publishable_gw3Q6-zy-FkE3MPpjDsTrQ_hZEPnIRc")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 class PixRequest(BaseModel):
-    chave: str = Field(..., min_length=1)
-    nome: str = Field(..., max_length=25)
-    cidade: str = Field(..., max_length=15)
-    txid: str = Field("***", max_length=25)
-    valor: float = Field(None, ge=0.01)
+    chave: str
+    nome: str
+    cidade: str
+    valor: float
+    txid: str = "LOJA01"
 
-    @field_validator('nome', 'cidade')
-    @classmethod
-    def limpar_texto(cls, v):
-        # Remove acentos e força maiúsculas para o padrão do Banco Central
-        return unidecode(v).upper()
-
-# --- SERVIÇO CORE (LÓGICA PIX) ---
 class PixService:
     @staticmethod
-    def _crc16_ccitt(payload: str) -> str:
+    def _crc16(payload: str) -> str:
         crc = 0xFFFF
-        polynomial = 0x1021
         for byte in payload.encode('utf-8'):
             crc ^= (byte << 8)
             for _ in range(8):
-                if (crc & 0x8000):
-                    crc = (crc << 1) ^ polynomial
-                else:
-                    crc = crc << 1
+                crc = (crc << 1) ^ 0x1021 if (crc & 0x8000) else crc << 1
         return hex(crc & 0xFFFF)[2:].upper().zfill(4)
 
-    @staticmethod
-    def _format(id, valor):
-        return f"{id}{len(valor):02}{valor}"
-
     @classmethod
-    def gerar_payload(cls, d: PixRequest) -> str:
-        # Montagem dos campos padrão EMV
+    def gerar(cls, d: PixRequest):
+        def f(id, v): return f"{id}{len(v):02}{v}"
         campos = [
-            cls._format("00", "01"),
-            cls._format("26", cls._format("00", "br.gov.bcb.pix") + cls._format("01", d.chave)),
-            cls._format("52", "0000"),
-            cls._format("53", "986"),
+            f("00", "01"),
+            f("26", f("00", "br.gov.bcb.pix") + f("01", d.chave)),
+            f("52", "0000"), f("53", "986"),
+            f("54", f"{d.valor:.2f}"), f("58", "BR"),
+            f("59", unidecode(d.nome).upper()[:25]),
+            f("60", unidecode(d.cidade).upper()[:15]),
+            f("62", f("05", d.txid[:25])), "6304"
         ]
-        
-        if d.valor:
-            campos.append(cls._format("54", f"{d.valor:.2f}"))
-        
-        campos.extend([
-            cls._format("58", "BR"),
-            cls._format("59", d.nome),
-            cls._format("60", d.cidade),
-            cls._format("62", cls._format("05", d.txid)),
-            "6304" # ID do CRC
-        ])
+        pre = "".join(campos)
+        return pre + cls._crc16(pre)
 
-        payload_parcial = "".join(campos)
-        return payload_parcial + cls._crc16_ccitt(payload_parcial)
-
-# --- ENDPOINT PRINCIPAL ---
 @app.post("/api/v1/pix")
 async def criar_pix(request: PixRequest):
-    try:
-        # 1. Gerar a string Pix Copia e Cola
-        payload = PixService.gerar_payload(request)
-        
-        # 2. Gerar o QR Code em Base64
-        qr = segno.make(payload, error='M')
-        buffer = BytesIO()
-        qr.save(buffer, kind='png', scale=10)
-        qr_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-        
-        return {
-            "status": "success",
-            "data": {
-                "payload": payload,
-                "qrcode_base64": qr_base64
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+    id_venda = str(uuid.uuid4())[:8]
+    payload = PixService.gerar(request)
+    
+    # Salva no Supabase
+    data = {
+        "id": id_venda,
+        "valor": request.valor,
+        "txid": request.txid,
+        "status": "PENDENTE"
+    }
+    supabase.table("transacoes").insert(data).execute()
 
-# Endpoint de saúde para o Render não derrubar a API
-@app.get("/")
-def health_check():
-    return {"status": "online", "message": "API Pix ativa"}
+    qr = segno.make(payload, error='M')
+    buffer = BytesIO()
+    qr.save(buffer, kind='png', scale=10)
+    
+    return {
+        "id_transacao": id_venda,
+        "payload": payload,
+        "qrcode_base64": f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+    }
+
+@app.get("/api/v1/status/{id_transacao}")
+def checar_status(id_transacao: str):
+    response = supabase.table("transacoes").select("status").eq("id", id_transacao).execute()
+    if not response.data:
+        raise HTTPException(404, "Não encontrado")
+    return {"status": response.data[0]["status"]}
+
+@app.get("/api/v1/admin/confirmar/{id_transacao}")
+def confirmar_admin(id_transacao: str):
+    supabase.table("transacoes").update({"status": "PAGO"}).eq("id", id_transacao).execute()
+    return {"message": "Pagamento confirmado via Supabase!"}
