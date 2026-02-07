@@ -1,115 +1,109 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 import segno
 from unidecode import unidecode
 from io import BytesIO
 import base64
 
+# --- INICIALIZAÇÃO DA API ---
 app = FastAPI(
-    title="API Pix Generator Robust",
-    description="Gera payloads EMV QRCPS (Pix Copia e Cola) e QR Codes em Base64.",
-    version="1.0.0"
+    title="API Pix Robusta",
+    description="Geração de Pix Estático com QR Code e suporte a CORS",
+    version="1.1.0"
 )
 
-# --- MODELO DE DADOS COM VALIDAÇÃO ---
-class PixRequest(BaseModel):
-    chave: str = Field(..., description="Chave Pix (CPF, Email, Tel ou Aleatória)", min_length=1)
-    nome: str = Field(..., description="Nome do beneficiário", max_length=25)
-    cidade: str = Field(..., description="Cidade do beneficiário", max_length=15)
-    txid: str = Field("***", description="Identificador da transação (opcional)", max_length=25)
-    valor: float = Field(None, description="Valor da transação (opcional)", ge=0.01)
+# --- CONFIGURAÇÃO DE CORS ---
+# Isso permite que seu site de doação (ou qualquer outro) acesse a API sem ser bloqueado
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # Sanitização automática: Remove acentos e força maiúsculas
+# --- MODELO DE DADOS (VALIDAÇÃO) ---
+class PixRequest(BaseModel):
+    chave: str = Field(..., min_length=1)
+    nome: str = Field(..., max_length=25)
+    cidade: str = Field(..., max_length=15)
+    txid: str = Field("***", max_length=25)
+    valor: float = Field(None, ge=0.01)
+
     @field_validator('nome', 'cidade')
-    def sanitizar_texto(cls, v):
-        # Transforma "São Paulo" em "SAO PAULO"
+    @classmethod
+    def limpar_texto(cls, v):
+        # Remove acentos e força maiúsculas para o padrão do Banco Central
         return unidecode(v).upper()
 
-# --- LÓGICA DE NEGÓCIO (CORE) ---
+# --- SERVIÇO CORE (LÓGICA PIX) ---
 class PixService:
     @staticmethod
     def _crc16_ccitt(payload: str) -> str:
-        """Calcula o CRC-16-CCITT (0x1021) sem dependências externas."""
         crc = 0xFFFF
         polynomial = 0x1021
-        encoded = payload.encode('utf-8')
-        
-        for byte in encoded:
+        for byte in payload.encode('utf-8'):
             crc ^= (byte << 8)
             for _ in range(8):
                 if (crc & 0x8000):
                     crc = (crc << 1) ^ polynomial
                 else:
                     crc = crc << 1
-        
         return hex(crc & 0xFFFF)[2:].upper().zfill(4)
 
     @staticmethod
-    def _formatar(id_campo: str, valor: str) -> str:
-        return f"{id_campo}{len(valor):02}{valor}"
+    def _format(id, valor):
+        return f"{id}{len(valor):02}{valor}"
 
     @classmethod
-    def gerar_payload(cls, dados: PixRequest) -> str:
-        # Payload Basico
-        payload = [
-            cls._formatar("00", "01"),  # Payload Format Indicator
-            cls._formatar("26", cls._formatar("00", "br.gov.bcb.pix") + cls._formatar("01", dados.chave)),
-            cls._formatar("52", "0000"), # Merchant Category Code
-            cls._formatar("53", "986"),  # Moeda (BRL)
+    def gerar_payload(cls, d: PixRequest) -> str:
+        # Montagem dos campos padrão EMV
+        campos = [
+            cls._format("00", "01"),
+            cls._format("26", cls._format("00", "br.gov.bcb.pix") + cls._format("01", d.chave)),
+            cls._format("52", "0000"),
+            cls._format("53", "986"),
         ]
-
-        if dados.valor:
-            payload.append(cls._formatar("54", f"{dados.valor:.2f}"))
-
-        payload.extend([
-            cls._formatar("58", "BR"),
-            cls._formatar("59", dados.nome), # Já sanitizado pelo Pydantic
-            cls._formatar("60", dados.cidade), # Já sanitizado
-            cls._formatar("62", cls._formatar("05", dados.txid)),
-            "6304" # Placeholder para o CRC
+        
+        if d.valor:
+            campos.append(cls._format("54", f"{d.valor:.2f}"))
+        
+        campos.extend([
+            cls._format("58", "BR"),
+            cls._format("59", d.nome),
+            cls._format("60", d.cidade),
+            cls._format("62", cls._format("05", d.txid)),
+            "6304" # ID do CRC
         ])
 
-        payload_str = "".join(payload)
-        crc = cls._crc16_ccitt(payload_str)
-        return payload_str + crc
+        payload_parcial = "".join(campos)
+        return payload_parcial + cls._crc16_ccitt(payload_parcial)
 
-    @staticmethod
-    def gerar_qrcode_base64(payload_pix: str) -> str:
-        """Gera o QR Code e retorna em Base64 para uso direto em tags <img>"""
-        try:
-            # Cria o QR Code com a lib Segno (Micro QR automático se possível)
-            qr = segno.make(payload_pix, error='M') 
-            
-            # Salva em buffer de memória
-            buffer = BytesIO()
-            qr.save(buffer, kind='png', scale=5)
-            
-            # Converte para base64
-            b64_img = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            return f"data:image/png;base64,{b64_img}"
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erro ao gerar imagem QR: {str(e)}")
-
-# --- ENDPOINTS ---
-@app.post("/api/v1/pix", tags=["Pix"])
-def criar_pix(request: PixRequest):
-    # 1. Gera a string Copia e Cola
-    pix_string = PixService.gerar_payload(request)
-    
-    # 2. Gera a imagem Base64
-    qr_image = PixService.gerar_qrcode_base64(pix_string)
-    
-    return {
-        "status": "success",
-        "data": {
-            "payload": pix_string,
-            "qrcode_base64": qr_image,
-            "mensagem": "Use o campo 'qrcode_base64' dentro de <img src='...'> no HTML"
+# --- ENDPOINT PRINCIPAL ---
+@app.post("/api/v1/pix")
+async def criar_pix(request: PixRequest):
+    try:
+        # 1. Gerar a string Pix Copia e Cola
+        payload = PixService.gerar_payload(request)
+        
+        # 2. Gerar o QR Code em Base64
+        qr = segno.make(payload, error='M')
+        buffer = BytesIO()
+        qr.save(buffer, kind='png', scale=10)
+        qr_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+        
+        return {
+            "status": "success",
+            "data": {
+                "payload": payload,
+                "qrcode_base64": qr_base64
+            }
         }
-    }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
-# Entrypoint para debug
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+# Endpoint de saúde para o Render não derrubar a API
+@app.get("/")
+def health_check():
+    return {"status": "online", "message": "API Pix ativa"}
