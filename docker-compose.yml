@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  pix-api:
+    build: .
+    container_name: pix_generator_api
+    ports:
+      - "8000:8000"
+    restart: always
+
