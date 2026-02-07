@@ -17,8 +17,8 @@ app.add_middleware(
 
 # --- CONFIGURAÇÃO SUPABASE ---
 # No Render, você vai adicionar essas duas como Variáveis de Ambiente
-SUPABASE_URL = os.getenv("https://xrjjoejdffoygwmpvrsq.supabase.co")
-SUPABASE_KEY = os.getenv("sb_publishable_gw3Q6-zy-FkE3MPpjDsTrQ_hZEPnIRc")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 class PixRequest(BaseModel):
