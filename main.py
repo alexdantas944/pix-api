@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from supabase import create_client, Client
 import segno
 import base64
 import uuid
 import os
+import asyncio  # Importado para o timer
+import httpx    # Importado para fazer a requisição de ping (equivalente ao axios)
 from unidecode import unidecode
 from io import BytesIO
 from typing import Optional
@@ -14,7 +16,6 @@ from typing import Optional
 app = FastAPI(title="API Pix Pixels - Supabase Edition")
 
 # --- CONFIGURAÇÃO DE CORS ---
-# Permite que seu site (localhost ou outro) acesse a API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,16 +25,41 @@ app.add_middleware(
 )
 
 # --- CONEXÃO SUPABASE ---
-# As variáveis abaixo devem ser configuradas no Painel do Render (Environment)
 URL = os.environ.get("SUPABASE_URL")
 KEY = os.environ.get("SUPABASE_KEY")
+# Recomendo criar uma variável de ambiente chamada SELF_URL no Render 
+# com o endereço da sua própria API (ex: https://sua-api.onrender.com)
+SELF_URL = os.environ.get("SELF_URL")
 
 if not URL or not KEY:
-    # Aviso no log do Render caso as chaves não tenham sido preenchidas
     print("ERRO CRÍTICO: Variáveis SUPABASE_URL ou SUPABASE_KEY não configuradas!")
     supabase = None
 else:
     supabase: Client = create_client(URL, KEY)
+
+# --- LÓGICA PARA MANTER A API ACORDADA (SELF-PING) ---
+async def keep_awake():
+    """
+    Faz uma requisição para si mesmo a cada 10 minutos para evitar o sleep do Render.
+    """
+    await asyncio.sleep(5) # Espera 5 segundos após iniciar
+    while True:
+        if SELF_URL:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(f"{SELF_URL}/ping")
+                    print(f"Self-ping efetuado: {response.status_code}")
+            except Exception as e:
+                print(f"Erro no self-ping: {e}")
+        else:
+            print("Aviso: SELF_URL não configurada. O self-ping não funcionará.")
+        
+        await asyncio.sleep(600) # 600 segundos = 10 minutos
+
+@app.on_event("startup")
+async def startup_event():
+    # Inicia a tarefa de manter acordado em segundo plano
+    asyncio.create_task(keep_awake())
 
 # --- MODELOS DE DADOS ---
 class PixRequest(BaseModel):
@@ -81,15 +107,18 @@ def health_check():
     status = "conectado" if supabase else "sem_banco_de_dados"
     return {"status": "online", "supabase": status}
 
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
+
 @app.post("/api/v1/pix")
 async def criar_pix(request: PixRequest):
     if not supabase:
-        raise HTTPException(status_code=500, detail="Banco de dados não configurado no Render.")
+        raise HTTPException(status_code=500, detail="Banco de dados não configurado.")
 
     id_venda = str(uuid.uuid4())[:8]
     payload_pix = PixService.gerar(request)
     
-    # 1. Salva a transação no Supabase
     try:
         data = {
             "id": id_venda,
@@ -102,7 +131,6 @@ async def criar_pix(request: PixRequest):
         print(f"Erro Supabase: {e}")
         raise HTTPException(status_code=500, detail="Erro ao salvar no banco.")
 
-    # 2. Gera o QR Code
     qr = segno.make(payload_pix, error='M')
     buffer = BytesIO()
     qr.save(buffer, kind='png', scale=10)
@@ -121,16 +149,14 @@ async def checar_status(id_transacao: str):
         raise HTTPException(status_code=404, detail="Transação não encontrada")
     return {"status": response.data[0]["status"]}
 
-# --- ENDPOINTS EXCLUSIVOS DO ADMIN ---
+# --- ENDPOINTS ADMIN ---
 
 @app.get("/api/v1/admin/todas")
 async def listar_todas():
-    # Retorna as últimas 20 transações para o Painel Admin
     response = supabase.table("transacoes").select("*").order("created_at", desc=True).limit(20).execute()
     return response.data
 
 @app.get("/api/v1/admin/confirmar/{id_transacao}")
 async def confirmar_pagamento(id_transacao: str):
-    # Atualiza o status para PAGO
     supabase.table("transacoes").update({"status": "PAGO"}).eq("id", id_transacao).execute()
     return {"message": "Pagamento confirmado com sucesso!"}
