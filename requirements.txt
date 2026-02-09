@@ -4,5 +4,3 @@ pydantic
 segno
 unidecode
 supabase
-httpx 
-python-multipart
