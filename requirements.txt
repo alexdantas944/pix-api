@@ -4,3 +4,4 @@ pydantic
 segno
 unidecode
 supabase
+httpx 
