@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<meta name="description" content="Checkout PIX profissional • Alex Dantas">
+<title>Checkout PIX • Alex Motoboy • Woovi</title>
+<style>
+:root{
+ --bg:#060606;--panel:#101010;--panel2:#151515;--input:#0a0a0a;--text:#f7f7f7;
+ --muted:#969696;--gold:#e2bb56;--gold2:#9d741b;--line:#282828;
+ --green:#41df83;--red:#ff6262;--blue:#65a9ff;--shadow:0 24px 80px rgba(0,0,0,.5)
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+ margin:0;min-height:100vh;color:var(--text);
+ font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+ background:
+ radial-gradient(circle at 50% -10%,rgba(226,187,86,.19),transparent 33%),
+ radial-gradient(circle at 100% 50%,rgba(226,187,86,.055),transparent 30%),var(--bg)
+}
+button,input,textarea{font:inherit}
+button{touch-action:manipulation}
+.app{width:min(100%,600px);margin:auto;padding:14px 15px 45px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin:2px 0 16px}
+.brand-mini{font-weight:900;font-size:13px;letter-spacing:.3px}.brand-mini b{color:var(--gold)}
+.secure{font-size:10px;color:#aaa;border:1px solid #292929;background:#0d0d0d;padding:7px 10px;border-radius:999px}
+.brand{text-align:center;margin:5px 0 22px}
+.logo{
+ width:68px;height:68px;margin:auto;border:1px solid #735b24;border-radius:21px;
+ display:grid;place-items:center;color:var(--gold);font-size:20px;font-weight:950;
+ background:linear-gradient(145deg,#191919,#0b0b0b);
+ box-shadow:0 14px 38px rgba(0,0,0,.45)
+}
+.brand h1{font-size:24px;line-height:1.05;margin:13px 0 5px;letter-spacing:-.5px}
+.brand p{margin:0;color:var(--muted);font-size:12px}
+.card{
+ background:linear-gradient(145deg,rgba(22,22,22,.98),rgba(10,10,10,.98));
+ border:1px solid var(--line);border-radius:25px;padding:20px;margin-bottom:14px;box-shadow:var(--shadow)
+}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+.section-title{font-size:16px;font-weight:900}
+.badge{font-size:10px;color:var(--gold);background:#1a1509;border:1px solid #443715;padding:6px 9px;border-radius:999px}
+.label{display:block;color:var(--muted);font-size:11px;margin:0 0 7px}
+.input,.textarea{
+ width:100%;padding:14px 15px;border-radius:14px;border:1px solid #303030;
+ background:var(--input);color:#fff;outline:0;transition:.2s
+}
+.input:focus,.textarea:focus{border-color:#9a7628;box-shadow:0 0 0 3px rgba(226,187,86,.08)}
+.money{font-size:32px;font-weight:950;letter-spacing:-.8px}
+.textarea{resize:vertical;min-height:76px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:12px}
+.field{min-width:0}
+.quick-values{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:9px 0 2px}
+.quick-values button{
+ border:1px solid #303030;background:#111;color:#ddd;border-radius:11px;padding:9px 4px;font-size:11px;font-weight:800
+}
+.quick-values button:active{background:#1b1b1b}
+.btn{
+ width:100%;border:0;border-radius:15px;padding:15px;font-weight:900;font-size:14px;cursor:pointer;
+ transition:transform .12s,filter .2s,opacity .2s
+}
+.btn:active{transform:scale(.985)}
+.primary{background:linear-gradient(135deg,#edcb69,#a97b1b);color:#111;box-shadow:0 10px 30px rgba(202,158,45,.15)}
+.secondary{background:#1a1a1a;color:#fff;border:1px solid #303030}
+.btn:disabled{opacity:.5;cursor:wait}
+.total{
+ display:flex;justify-content:space-between;align-items:end;padding:13px 0 0;margin-top:13px;
+ border-top:1px solid #252525
+}
+.total span{font-size:12px;color:var(--muted)}.total strong{font-size:23px}
+.status{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:11px;margin-top:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px rgba(226,187,86,.4)}
+.dot.ok{background:var(--green);box-shadow:0 0 12px rgba(65,223,131,.4)}
+.dot.bad{background:var(--red);box-shadow:0 0 12px rgba(255,98,98,.4)}
+.hidden{display:none!important}
+.error{margin-top:11px;padding:12px;border-radius:13px;background:#2b1111;border:1px solid #602525;color:#ffb5b5;font-size:12px}
+.pay{text-align:center}
+.step{
+ display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:15px;color:#777;font-size:10px
+}
+.step span{padding:6px 9px;border-radius:999px;background:#171717;border:1px solid #282828}.step .active{color:#111;background:var(--gold);border-color:var(--gold)}
+.amount{font-size:40px;font-weight:950;letter-spacing:-1.2px;margin:4px}
+.merchant{font-size:12px;color:var(--muted)}
+.qr{
+ display:block;width:min(292px,77vw);height:min(292px,77vw);object-fit:contain;background:#fff;padding:10px;
+ border-radius:21px;margin:16px auto 17px;box-shadow:0 18px 46px rgba(0,0,0,.42)
+}
+.pixbox{
+ background:#090909;border:1px solid #303030;border-radius:14px;padding:13px;text-align:left;
+ font-size:11px;line-height:1.5;word-break:break-all;max-height:125px;overflow:auto;color:#ddd
+}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.copy-success{border-color:rgba(65,223,131,.35)!important}
+.timer{
+ margin:12px auto 0;width:max-content;max-width:100%;padding:7px 10px;border-radius:999px;
+ background:#15120b;border:1px solid #3b3017;color:#d9b958;font-size:10px
+}
+.summary .row{
+ display:flex;justify-content:space-between;gap:15px;padding:11px 0;border-bottom:1px solid #242424;font-size:12px
+}
+.summary .row:last-child{border:0}.summary span{color:var(--muted)}
+.summary strong{text-align:right;max-width:65%;overflow:hidden;text-overflow:ellipsis}
+.success-card{
+ text-align:center;border-color:rgba(65,223,131,.22);background:linear-gradient(145deg,#0d1711,#0a0e0b)
+}
+.success-icon{
+ width:58px;height:58px;margin:0 auto 9px;border-radius:50%;display:grid;place-items:center;
+ background:#102b1c;color:var(--green);font-size:29px;border:1px solid #235d3c
+}
+.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:14px}
+.trust div{
+ border:1px solid #242424;background:#0c0c0c;border-radius:12px;padding:9px 4px;text-align:center;color:#8c8c8c;font-size:9px
+}
+.notice{text-align:center;color:#666;font-size:10px;line-height:1.55;margin:14px 0 0}
+footer{text-align:center;color:#565656;font-size:10px;padding:8px}
+.loading{display:inline-flex;align-items:center;gap:8px}
+.spinner{width:15px;height:15px;border:2px solid #111;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:400px){.grid,.actions{grid-template-columns:1fr}.quick-values{grid-template-columns:repeat(2,1fr)}.money{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+ <div class="brand-mini"><b>ALEX</b> DANTAS</div>
+ <div class="secure">🔒 Checkout seguro</div>
+</div>
+
+<header class="brand">
+ <div class="logo">PIX</div>
+ <h1>Pagamento PIX</h1>
+ <p>Rápido, simples e direto ao ponto</p>
+</header>
+
+<section id="form" class="card">
+ <div class="title-row"><div class="section-title">Criar cobrança</div><div class="badge">PIX</div></div>
+
+ <label class="label" for="valor">Valor do pagamento</label>
+ <input id="valor" class="input money" inputmode="decimal" autocomplete="off" placeholder="R$ 0,00" aria-label="Valor do pagamento">
+
+ <div class="quick-values">
+  <button type="button" data-value="10">R$ 10</button>
+  <button type="button" data-value="20">R$ 20</button>
+  <button type="button" data-value="50">R$ 50</button>
+  <button type="button" data-value="100">R$ 100</button>
+ </div>
+
+ <div class="grid">
+  <div class="field">
+   <label class="label" for="cliente">Cliente <small>(opcional)</small></label>
+   <input id="cliente" class="input" maxlength="60" autocomplete="name" placeholder="Nome">
+  </div>
+  <div class="field">
+   <label class="label" for="pedido">Pedido <small>(opcional)</small></label>
+   <input id="pedido" class="input" maxlength="25" autocomplete="off" placeholder="PEDIDO123">
+  </div>
+ </div>
+
+ <div style="margin-top:12px">
+  <label class="label" for="descricao">Descrição <small>(opcional)</small></label>
+  <textarea id="descricao" class="textarea" maxlength="120" placeholder="Ex.: Entrega, serviço ou pedido"></textarea>
+ </div>
+
+ <div class="total"><span>Total da cobrança</span><strong id="total">R$ 0,00</strong></div>
+ <div style="height:14px"></div>
+ <button id="gerar" class="btn primary">Gerar cobrança PIX</button>
+
+ <div id="erro" class="error hidden" role="alert"></div>
+ <div class="status"><span id="dot" class="dot"></span><span id="status">Pronto para gerar</span></div>
+
+ <div class="trust">
+  <div>🔐 Protegido</div><div>⚡ Instantâneo</div><div>📱 Mobile</div>
+ </div>
+</section>
+
+<section id="pagamento" class="card pay hidden">
+ <div class="step"><span class="active">1 • PIX</span><span>2 • Pagamento</span><span>3 • Confirmação</span></div>
+ <div style="font-size:11px;color:var(--muted)">Cobrança criada</div>
+ <div id="amount" class="amount">R$ 0,00</div>
+ <div id="merchant" class="merchant">ALEX DA SILVA DANTAS • FORTALEZA</div>
+ <div id="timer" class="timer hidden">⏱ Expiração: <b id="countdown">--:--</b></div>
+
+ <img id="qr" class="qr" alt="QR Code para pagamento PIX">
+
+ <label class="label" style="text-align:left">PIX Copia e Cola</label>
+ <div id="payload" class="pixbox"></div>
+
+ <div class="actions">
+  <button id="copiar" class="btn primary">Copiar PIX</button>
+  <button id="compartilhar" class="btn secondary">Compartilhar</button>
+ </div>
+ <div class="actions">
+  <button id="whatsapp" class="btn secondary">Enviar no WhatsApp</button>
+  <button id="novo" class="btn secondary">Nova cobrança</button>
+ </div>
+
+ <div id="copystatus" class="status"><span class="dot"></span><span>Escaneie o QR Code ou copie o código.</span></div>
+ <p class="notice">A confirmação automática do pagamento depende do webhook/PSP conectado à sua API.</p>
+</section>
+
+<section id="resumo" class="card summary hidden">
+ <div class="title-row"><div class="section-title">Resumo</div><div class="badge">AGUARDANDO</div></div>
+ <div class="row"><span>Cliente</span><strong id="clienteOut">—</strong></div>
+ <div class="row"><span>Pedido</span><strong id="pedidoOut">—</strong></div>
+ <div class="row"><span>Descrição</span><strong id="descricaoOut">—</strong></div>
+ <div class="row"><span>Valor</span><strong id="valorOut">—</strong></div>
+ <div class="row"><span>Status</span><strong id="statusOut">PIX aguardando pagamento</strong></div>
+</section>
+
+<section id="sucesso" class="card success-card hidden">
+ <div class="success-icon">✓</div>
+ <div class="section-title">Pagamento confirmado</div>
+ <p style="color:#aaa;font-size:12px;margin:7px 0 14px">O pagamento foi identificado com sucesso.</p>
+ <button id="novo2" class="btn primary">Nova cobrança</button>
+</section>
+
+<footer>Woovi/OpenPix • Checkout Alex Motoboy v4.0</footer>
+</div>
+
+<script>
+"use strict";
+
+const API="https://api-pix-alex.onrender.com";
+// O backend deve expor /api/checkout/create, /api/checkout/status/:orderId.
+// O AppID/segredo da Woovi NUNCA fica neste HTML.
+const $=id=>document.getElementById(id);
+let countdownTimer=null;
+
+function parseValor(v){
+ let s=String(v||"").trim().replace(/[R$\s]/g,"");
+ if(!s)return null;
+ if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");
+ const n=Number(s);
+ return Number.isFinite(n)&&n>0?Math.round(n*100)/100:null;
+}
+function brl(n){return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n)}
+function erro(t){$("erro").textContent=t;$("erro").classList.remove("hidden")}
+function setStatus(text,type=""){$("status").textContent=text;$("dot").className="dot"+(type?" "+type:"")}
+function txid(v){return String(v||"").trim().replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,25)}
+function updateTotal(){const n=parseValor($("valor").value);$("total").textContent=n?brl(n):"R$ 0,00"}
+function setGenerating(on){
+ $("gerar").disabled=on;
+ $("gerar").innerHTML=on?'<span class="loading"><span class="spinner"></span>Gerando cobrança...</span>':"Gerar cobrança PIX";
+}
+
+async function gerar(){
+ $("erro").classList.add("hidden");
+ const n=parseValor($("valor").value);
+ if(n===null){erro("Informe um valor válido maior que zero.");$("valor").focus();return}
+ const cliente=$("cliente").value.trim();
+ const pedido=txid($("pedido").value)||"";
+ const descricao=$("descricao").value.trim();
+ setGenerating(true);setStatus("Criando cobrança segura...");
+ try{
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  const r=await fetch(API+"/api/checkout/create",{
+   method:"POST",
+   headers:{"Content-Type":"application/json",Accept:"application/json"},
+   body:JSON.stringify({amount:n,name:cliente||"Cliente",email:"",phone:"",cpf:"",description:descricao||"Pedido Alex Motoboy",orderCode:pedido}),
+   signal:controller.signal
+  });
+  clearTimeout(timeout);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.success)throw Error(d.error||"Não foi possível criar a cobrança PIX.");
+  if(!d.charge||!d.charge.brCode)throw Error("O servidor não retornou o PIX Copia e Cola.");
+
+  window.currentOrderId=d.orderId;
+  window.currentCorrelationID=d.correlationID;
+  window.paymentPolling=true;
+
+  const amount=Number(d.amount??n);
+  $("amount").textContent=brl(amount);
+  $("valorOut").textContent=brl(amount);
+  $("merchant").textContent=d.merchant||"ALEX MOTOBOY • FORTALEZA";
+  $("payload").textContent=d.charge.brCode;
+  if(d.charge.qrCodeImage)$("qr").src=d.charge.qrCodeImage;
+  else if(d.charge.qrCode)$("qr").src=d.charge.qrCode;
+  else $("qr").removeAttribute("src");
+
+  $("clienteOut").textContent=cliente||"Não informado";
+  $("pedidoOut").textContent=d.orderCode||d.orderId||pedido||"Gerado automaticamente";
+  $("descricaoOut").textContent=descricao||"Pedido Alex Motoboy";
+  $("statusOut").textContent="PIX aguardando pagamento";
+  $("resumo").querySelector(".badge").textContent="AGUARDANDO";
+
+  $("form").classList.add("hidden");
+  $("pagamento").classList.remove("hidden");
+  $("resumo").classList.remove("hidden");
+  $("sucesso").classList.add("hidden");
+  setStatus("PIX gerado com sucesso","ok");
+  window.scrollTo({top:0,behavior:"smooth"});
+
+  if(d.charge.expiresDate)startCountdown(d.charge.expiresDate);
+  else $("timer").classList.add("hidden");
+
+  iniciarMonitoramento();
+ }catch(e){
+  setStatus("Falha na comunicação","bad");
+  erro(e.name==="AbortError"?"O servidor demorou demais para responder. Tente novamente.":e.message);
+ }finally{setGenerating(false)}
+}
+
+let statusTimer=null;
+function iniciarMonitoramento(){
+ clearTimeout(statusTimer);
+ const check=async()=>{
+  if(!window.currentOrderId||!window.paymentPolling)return;
+  try{
+   const r=await fetch(API+"/api/checkout/status/"+encodeURIComponent(window.currentOrderId),{headers:{Accept:"application/json"},cache:"no-store"});
+   const d=await r.json().catch(()=>({}));
+   if(r.ok&&d.status){
+    if(d.status==="PAID"){
+     window.paymentPolling=false;
+     $("statusOut").textContent="Pagamento confirmado";
+     $("resumo").querySelector(".badge").textContent="PAGO";
+     $("sucesso").classList.remove("hidden");
+     $("pagamento").classList.add("hidden");
+     $("copystatus").innerHTML='<span class="dot ok"></span><span>Pagamento confirmado pela Woovi.</span>';
+     setStatus("Pagamento confirmado","ok");
+     clearInterval(countdownTimer);
+     window.scrollTo({top:0,behavior:"smooth"});
+     return;
+    }
+    if(d.status==="EXPIRED"){
+     window.paymentPolling=false;
+     $("statusOut").textContent="PIX expirado";
+     $("resumo").querySelector(".badge").textContent="EXPIRADO";
+     $("copystatus").innerHTML='<span class="dot bad"></span><span>Este PIX expirou. Gere uma nova cobrança.</span>';
+     setStatus("PIX expirado","bad");
+     return;
+    }
+   }
+  }catch{}
+  statusTimer=setTimeout(check,3000);
+ };
+ check();
+}
+
+function startCountdown(iso){
+ clearInterval(countdownTimer);
+ const end=new Date(iso).getTime();
+ if(!Number.isFinite(end))return;
+ $("timer").classList.remove("hidden");
+ function tick(){
+  const left=Math.max(0,end-Date.now());
+  const sec=Math.floor(left/1000),m=Math.floor(sec/60),s=sec%60;
+  $("countdown").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+  if(left<=0){clearInterval(countdownTimer);$("countdown").textContent="EXPIRADO";$("timer").style.color="#ff8585"}
+ }
+ tick();countdownTimer=setInterval(tick,1000);
+}
+
+function reset(){
+ clearInterval(countdownTimer);
+ clearTimeout(statusTimer);
+ window.paymentPolling=false;window.currentOrderId=null;
+ $("pagamento").classList.add("hidden");$("resumo").classList.add("hidden");$("sucesso").classList.add("hidden");
+ $("form").classList.remove("hidden");$("erro").classList.add("hidden");
+ $("valor").value="";$("cliente").value="";$("pedido").value="";$("descricao").value="";
+ $("total").textContent="R$ 0,00";setStatus("Pronto para gerar");$("valor").focus();
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+$("valor").addEventListener("input",updateTotal);
+$("valor").addEventListener("keydown",e=>{if(e.key==="Enter")gerar()});
+$("gerar").onclick=gerar;
+document.querySelectorAll("[data-value]").forEach(b=>b.onclick=()=>{$("valor").value=b.dataset.value;updateTotal();$("valor").focus()});
+
+$("copiar").onclick=async()=>{
+ const payload=$("payload").textContent.trim();if(!payload)return;
+ try{
+  if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(payload);
+  else{
+   const ta=document.createElement("textarea");ta.value=payload;ta.style.position="fixed";ta.style.opacity="0";
+   document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");ta.remove();
+  }
+  $("copiar").textContent="✓ PIX Copiado";$("copiar").classList.add("copy-success");
+  $("copystatus").innerHTML='<span class="dot ok"></span><span>PIX Copia e Cola copiado!</span>';
+  setTimeout(()=>{$("copiar").textContent="Copiar PIX";$("copiar").classList.remove("copy-success")},2200);
+ }catch{$("copystatus").innerHTML='<span class="dot bad"></span><span>Não foi possível copiar automaticamente.</span>'}
+};
+
+$("compartilhar").onclick=async()=>{
+ const text="Pagamento PIX • Alex Dantas\nValor: "+$("amount").textContent+"\nPedido: "+$("pedidoOut").textContent;
+ try{
+  if(navigator.share)await navigator.share({title:"Pagamento PIX",text});
+  else await navigator.clipboard.writeText(text);
+ }catch{}
+};
+
+$("whatsapp").onclick=()=>{
+ const msg="Olá! Segue minha cobrança PIX.\n\nValor: "+$("amount").textContent+
+ "\nPedido: "+$("pedidoOut").textContent+
+ ($("descricao").value.trim()?"\nDescrição: "+$("descricao").value.trim():"")+
+ "\n\nPIX Copia e Cola:\n"+$("payload").textContent;
+ window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");
+};
+
+$("novo").onclick=reset;
+$("novo2").onclick=reset;
+</script>
+</body>
+</html>
