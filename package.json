@@ -1,0 +1,7 @@
+{
+  "name": "checkout-alex-motoboy-woovi",
+  "version": "4.0.0",
+  "private": true,
+  "scripts": {"start":"node server.js"},
+  "dependencies": {"dotenv":"^16.6.1","express":"^5.1.0"}
+}
